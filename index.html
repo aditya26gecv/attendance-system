@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Attendance Management System</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #f4f4f4; 
+            padding: 20px;
+        }
+        .container {
+            background: #fff; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); 
+            max-width: 600px; 
+            margin: auto;
+        }
+        h1 { color: #333; text-align: center; }
+        input, select, button {
+            padding: 10px;
+            margin-top: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        table {
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px; 
+            border: 1px solid #ccc; 
+            text-align: left;
+        }
+        th {
+            background: #e2e2e2;
+        }
+        .btn {
+            background: #2f8b2f; 
+            color: #fff; 
+            border: none;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background: #246624;
+        }
+        .edit-btn {
+            background: #e28743;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            padding: 7px 12px;
+        }
+        .edit-btn:hover {
+            background: #b96423;
+        }
+        label.delete-label {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Attendance Management System</h1>
+        
+        <form id="attendance-form">
+            <label for="date">Date:</label>
+            <input type="date" id="date" required>
+
+            <label for="regno">Registration Number:</label>
+            <input type="text" id="regno" placeholder="Enter Registration Number" required>
+            
+            <label for="name">Student Name:</label>
+            <input type="text" id="name" placeholder="Enter Name" required>
+            
+            <label for="status">Status:</label>
+            <select id="status" required>
+                <option value="Present">Present</option>
+                <option value="Absent">Absent</option>
+            </select>
+            
+            <input type="hidden" id="edit-index" value="">
+            <button class="btn" type="submit" id="submit-btn">Mark Attendance</button>
+        </form>
+        
+        <button class="btn" onclick="viewRecords()">View Attendance Records</button>
+        <button class="btn" onclick="downloadRecords()">Download CSV</button>
+        
+        <label for="delete-name" class="delete-label">Delete Attendance Record (by Name and Date):</label>
+        <input type="text" id="delete-name" placeholder="Enter student's name">
+        <input type="date" id="delete-date" placeholder="Select date">
+        <button class="btn" onclick="deletePersonAttendance()">Delete Attendance</button>
+        
+        <div id="attendance-table"></div>
+    </div>
+
+<script>
+    function getAttendance() {
+        return JSON.parse(localStorage.getItem('attendance') || '[]');
+    }
+
+    function saveAttendance(records) {
+        localStorage.setItem('attendance', JSON.stringify(records));
+    }
+
+    document.getElementById('attendance-form').onsubmit = function(e) {
+        e.preventDefault();
+
+        let date = document.getElementById('date').value;
+        let regno = document.getElementById('regno').value.trim();
+        let name = document.getElementById('name').value.trim();
+        let status = document.getElementById('status').value;
+        let editIndex = document.getElementById('edit-index').value;
+        let records = getAttendance();
+
+        if (editIndex !== "") {
+            records[editIndex] = { date, regno, name, status };
+            saveAttendance(records);
+            alert('Attendance updated!');
+            document.getElementById('submit-btn').textContent = 'Mark Attendance';
+            document.getElementById('edit-index').value = "";
+        } else {
+            if (!date || !name || !regno) return;
+            records.push({date, regno, name, status});
+            saveAttendance(records);
+            alert('Attendance marked!');
+        }
+        this.reset();
+        viewRecords();
+    };
+
+    function viewRecords() {
+        let records = getAttendance();
+        if(records.length === 0) {
+            document.getElementById('attendance-table').innerHTML = '<p>No attendance records found.</p>';
+            return;
+        }
+        let html = '<table><tr><th>Date</th><th>Reg. No.</th><th>Name</th><th>Status</th><th>Edit</th></tr>';
+        records.forEach(function(rec, idx) {
+            html += `<tr>
+                <td>${rec.date}</td>
+                <td>${rec.regno}</td>
+                <td>${rec.name}</td>
+                <td>${rec.status}</td>
+                <td><button class="edit-btn" onclick="editRecord(${idx})">Edit</button></td>
+            </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('attendance-table').innerHTML = html;
+    }
+
+    function downloadRecords() {
+        let records = getAttendance();
+        if(records.length === 0) {
+            alert('No attendance records to download.');
+            return;
+        }
+        let csvContent = "Date,Registration Number,Name,Status\n";
+        records.forEach(function(rec) {
+            let safeDate = rec.date.replace(/,/g, '');
+            let safeRegNo = rec.regno.replace(/,/g, '');
+            let safeName = rec.name.replace(/,/g, '');
+            let safeStatus = rec.status.replace(/,/g, '');
+            csvContent += `${safeDate},${safeRegNo},${safeName},${safeStatus}\n`;
+        });
+        let blob = new Blob([csvContent], {type: 'text/csv'});
+        let a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'attendance_records.csv';
+        a.click();
+    }
+
+    function deletePersonAttendance() {
+        let nameToDelete = document.getElementById('delete-name').value.trim();
+        let dateToDelete = document.getElementById('delete-date').value;
+        if (!nameToDelete || !dateToDelete) {
+            alert("Please enter both name and date.");
+            return;
+        }
+        let records = getAttendance();
+        let initialLength = records.length;
+        let filteredRecords = records.filter(rec => 
+            !(rec.name.toLowerCase() === nameToDelete.toLowerCase() && rec.date === dateToDelete)
+        );
+        if (filteredRecords.length === initialLength) {
+            alert(`No attendance record found for '${nameToDelete}' on '${dateToDelete}'.`);
+            return;
+        }
+        saveAttendance(filteredRecords);
+        alert(`Attendance record for '${nameToDelete}' on '${dateToDelete}' deleted successfully.`);
+        document.getElementById('delete-name').value = '';
+        document.getElementById('delete-date').value = '';
+        viewRecords();
+    }
+
+    function editRecord(idx) {
+        let records = getAttendance();
+        let rec = records[idx];
+        document.getElementById('date').value = rec.date;
+        document.getElementById('regno').value = rec.regno;
+        document.getElementById('name').value = rec.name;
+        document.getElementById('status').value = rec.status;
+        document.getElementById('edit-index').value = idx;
+        document.getElementById('submit-btn').textContent = 'Update Attendance';
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+</script>
+</body>
+</html>
